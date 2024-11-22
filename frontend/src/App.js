@@ -53,45 +53,58 @@
 // export default Home;
 
 
-import React, { useState } from 'react';
+import React, { useState } from "react";
+import ReactDatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 
 const SubscriptionForm = () => {
   const [formData, setFormData] = useState({
-    email: '',
-    phone: '',
-    duration: '1',
-    specificDates: [],
-    daysType: 'weekdays',
-    quantity: '1',
-    deliveryTime: 'morning',
+    email: "",
+    phone: "",
+    duration: "1",
+    specificDates: [], // Ensure this is initialized as an array
+    daysType: "weekdays",
+    quantity: "1",
+    deliveryTime: "morning",
   });
 
   const subscriptionOptions = {
-    '1': { priceId: 'price_1QNTKeFDU5aLIEJOQXT6MNhj', label: '1 Month' },
-    '3': { priceId: 'price_1QNTKeFDU5aLIEJOH8UVodpO', label: '3 Months' },
-    '6': { priceId: 'price_1QNTKeFDU5aLIEJO612rddwS', label: '6 Months' },
-    '12': { priceId: 'price_1QNTKeFDU5aLIEJONURliDyj', label: '12 Months' },
+    "1": { label: "1 Month" },
+    "3": { label: "3 Months" },
+    "6": { label: "6 Months" },
+    "12": { label: "12 Months" },
+    none: { label: "None" }, // Added "None" option
   };
 
   const calculateTotal = () => {
-    const pricePerLiter = 200; // Fixed price per liter in LKR
-    const quantity = parseInt(formData.quantity);
-    const durationInMonths = parseInt(formData.duration);
-    const deliveryDaysPerWeek =
+    const pricePerLiter = 200; // Price per liter in LKR
+    const daysInWeek = 7;
+    const weekdaysInWeek = 5;
+    const quantity = parseInt(formData.quantity, 10);
+
+    if (formData.duration === "none") {
+      // Calculate for specific dates
+      const selectedDays = Array.isArray(formData.specificDates)
+        ? formData.specificDates.length
+        : 0; // Safeguard against invalid values
+      return selectedDays * quantity * pricePerLiter;
+    }
+
+    const durationInMonths = parseInt(formData.duration, 10);
+    const weeksInMonth = 4; // Approximation for calculation
+    const deliveryDays =
       formData.daysType === "weekdays"
-        ? 5
+        ? weekdaysInWeek
         : formData.daysType === "weekends"
-        ? 2
-        : 7; // Default to 'both' = 7 days per week
-  
-    // Total delivery days in the selected duration
-    const weeksInDuration = durationInMonths * 4; // Approximate 4 weeks in a month
-    const totalDeliveryDays = deliveryDaysPerWeek * weeksInDuration;
-  
-    // Total cost calculation
-    return pricePerLiter * quantity * totalDeliveryDays;
+        ? 2 // Saturdays and Sundays
+        : formData.daysType === "none"
+        ? 0 // No delivery days
+        : daysInWeek;
+
+    return (
+      durationInMonths * weeksInMonth * deliveryDays * quantity * pricePerLiter
+    );
   };
-  
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -101,43 +114,21 @@ const SubscriptionForm = () => {
     }));
   };
 
-  const handleDateChange = (e) => {
-    const { value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      specificDates: value.split(',').map((date) => date.trim()),
-    }));
+  const handleDateChange = (dates) => {
+    if (Array.isArray(dates)) {
+      setFormData((prev) => ({
+        ...prev,
+        specificDates: dates, // Set selected dates directly
+      }));
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    try {
-      const response = await fetch('http://localhost:5000/api/create-checkout-session', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: formData.email,
-          phone: formData.phone,
-          priceId: subscriptionOptions[formData.duration].priceId,
-          quantity: formData.quantity,
-          deliveryMetadata: {
-            duration: formData.duration,
-            specificDates: formData.specificDates,
-            daysType: formData.daysType,
-            deliveryTime: formData.deliveryTime,
-          },
-        }),
-      });
+    console.log("Form Data Submitted:", formData);
 
-      const { checkoutUrl } = await response.json();
-      window.location.href = checkoutUrl;
-    } catch (error) {
-      console.error('Checkout error:', error);
-      alert('There was an error processing your subscription.');
-    }
+    alert(`Subscription created! Total Amount: ${calculateTotal()} LKR`);
   };
 
   return (
@@ -189,13 +180,14 @@ const SubscriptionForm = () => {
         </div>
 
         <div>
-          <label className="block mb-2">Specific Dates (comma-separated)</label>
-          <input
-            type="text"
-            name="specificDates"
+          <label className="block mb-2">Specific Dates</label>
+          <ReactDatePicker
+            selected={null} // For multiple dates, we don't need `selected`
             onChange={handleDateChange}
-            className="w-full p-2 border rounded"
-            placeholder="E.g., 2024-12-25, 2024-12-31"
+            inline
+            isClearable
+            selectsMultiple
+            placeholderText="Select multiple dates"
           />
         </div>
 
@@ -210,6 +202,7 @@ const SubscriptionForm = () => {
             <option value="weekdays">Weekdays</option>
             <option value="weekends">Weekends</option>
             <option value="both">Both</option>
+            <option value="none">None</option>
           </select>
         </div>
 
